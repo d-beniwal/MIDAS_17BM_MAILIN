@@ -71,14 +71,23 @@ full fitted geometry, over the raw image) next to the calibration JSON;
 
 ## Requirements
 
-Conda environment `midas_17bm`, defined in `environment.yml`:
+Requires Python 3.12. Install via **either** conda or pip:
+
+**Conda** — environment `midas_17bm`, defined in `environment.yml`:
 
 ```bash
 conda env create -f environment.yml
 conda activate midas_17bm
 ```
 
-Provides `midas-suite` (which pulls in `midas_calibrate_v2`,
+**Pip** — into an existing Python 3.12 environment/virtualenv, via
+`requirements.txt` (mirrors the pip section of `environment.yml`):
+
+```bash
+pip install -r requirements.txt
+```
+
+Both provide `midas-suite` (which pulls in `midas_calibrate_v2`,
 `midas_integrate_v2`, `midas_hkls`, etc.), `torch`, `tifffile`,
 `scikit-image`, `contourpy`, `matplotlib`, `numpy`, `scipy`, `h5py`, and
 `hdf5plugin`. `scikit-image` is pinned explicitly because
