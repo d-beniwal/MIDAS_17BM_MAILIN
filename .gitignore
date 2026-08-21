@@ -1,0 +1,29 @@
+# Raw/derived beamline data (huge; lives on this workstation, not in git)
+beamline_data/
+
+# Old scratch work / prior draft pipeline
+archive/
+
+# Claude Code project context and docs (kept local per project convention)
+.context/
+CLAUDE.md
+.claude/
+
+# Pipeline outputs (calibration.json, residual_corr.bin, integrated profiles, plots)
+# residual_corr.bin alone runs tens of MB per calibration -- never commit these.
+pipeline_output/
+calib_out/
+calib_out_*/
+integrated_out/
+integrated_out_*/
+*.residual_corr.bin
+residual_corr.bin
+
+# Local dev scratch space (not part of the deliverable)
+_scratch_dev/
+
+# Jupyter / Python
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.DS_Store
