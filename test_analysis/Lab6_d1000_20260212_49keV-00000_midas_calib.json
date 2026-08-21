@@ -1,0 +1,81 @@
+{
+  "calibrant": "LaB6",
+  "calibrants": [
+    "LaB6"
+  ],
+  "sigma": {
+    "Lsd": 8.019771001995476,
+    "BC_y": 0.00323920898330616,
+    "BC_z": 0.003578249427917874,
+    "ty": 0.0014245033475728157,
+    "tz": 0.0013485426042428286,
+    "iso_R2": 8.616594682005945e-05,
+    "iso_R6": 0.0001837135540473856,
+    "iso_R4": 0.00023878704178028533
+  },
+  "unconstrained": [],
+  "at_bounds": [],
+  "diagnostics": [
+    {
+      "name": "strain_cap",
+      "severity": "ok",
+      "message": "converged strain 34.03 \u03bc\u03f5 \u2014 within calibrant range"
+    },
+    {
+      "name": "basin_check",
+      "severity": "ok",
+      "message": "seed-to-MAP drift: \u0394Lsd=+0 \u03bcm (+0.00 %), \u0394BC=0.0 px \u2014 within safe basin"
+    },
+    {
+      "name": "cross_validation",
+      "severity": "ok",
+      "message": "held-out residual 1.20\u00d7 train, KS p=8.71e-02 \u2014 model generalises across rings"
+    },
+    {
+      "name": "azimuth_coverage",
+      "severity": "ok",
+      "message": "azimuthal coverage 360\u00b0 (100 % of the ring, longest arc 360\u00b0)"
+    },
+    {
+      "name": "rho_d_scaling",
+      "severity": "ok",
+      "message": "RhoD=308.5 mm vs outermost fitted ring 295.4 mm (ratio 1.04, \u03c1_max=0.96) \u2014 radial terms well scaled"
+    }
+  ],
+  "wavelength_A": 0.25302897639428623,
+  "pxY_um": 150.0,
+  "pxZ_um": 150.0,
+  "NrPixelsY": 2880,
+  "NrPixelsZ": 2880,
+  "Lsd_um": 1001310.2146589451,
+  "BC_y_px": 1458.3370141825108,
+  "BC_z_px": 1428.090050749613,
+  "tx_deg": 0.0,
+  "ty_deg": 0.1313366821314741,
+  "tz_deg": -0.13185910779113685,
+  "distortion": {
+    "iso_R2": -0.0011144394034521138,
+    "iso_R4": 0.001297388654508862,
+    "iso_R6": -0.0006621611596176052,
+    "a1": 0.0,
+    "phi1": 0.0,
+    "a2": 0.0,
+    "phi2": 0.0,
+    "a3": 0.0,
+    "phi3": 0.0,
+    "a4": 0.0,
+    "phi4": 0.0,
+    "a5": 0.0,
+    "phi5": 0.0,
+    "a6": 0.0,
+    "phi6": 0.0
+  },
+  "in_loop_strain_uE": 34.034250544071746,
+  "post_residual_strain_uE": 34.034250544071746,
+  "residual_corr_bin": null,
+  "seed_BC_y": 1457.9811614604744,
+  "seed_BC_z": 1428.2030318033594,
+  "seed_Lsd_um": 1001398.3036877703,
+  "seed_seconds": 5.078315734863281e-05,
+  "refine_seconds": 202.45409893989563
+}
