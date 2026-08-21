@@ -57,7 +57,7 @@ CALIBRATE_KWARGS = dict(
 )
 
 # --- Integration binning defaults (mirrors MIDAS_GUI's own spin-box defaults)
-R_BIN_SIZE_PX            = 1.0
+R_BIN_SIZE_PX            = 0.5
 ETA_BIN_SIZE_DEG         = 5.0
 R_MIN_PX                 = 10.0
 R_MAX_PX                 = None       # None -> auto: beam-centre-to-farthest-corner
