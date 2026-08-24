@@ -278,8 +278,8 @@ def render_calibration_overlay_png(bundle: CalibrationBundle, calibration_json_p
     ax.imshow(disp, cmap='gray', vmin=vmin, vmax=vmax, origin='upper',
               extent=[0, NY, NZ, 0], aspect='equal')
     if segments:
-        ax.add_collection(LineCollection(segments, colors='#00E5FF', linewidths=0.8 * 0.8,
-                                          linestyles='dashed',
+        ax.add_collection(LineCollection(segments, colors='#00E5FF', linewidths=0.32,
+                                          linestyles='solid',
                                           label='predicted rings (tilt+distortion)'))
     ax.plot(float(spec.BC_y), float(spec.BC_z), marker='o', markersize=8, linestyle='none',
             markerfacecolor='red', markeredgecolor='yellow', markeredgewidth=1.2,
@@ -466,7 +466,7 @@ def render_intensity_plot_png(ir: IntegrationResult, out_png, *, title=None) -> 
     fig, ax = plt.subplots(figsize=(9.5, 4.6), dpi=100)
     ax.fill_between(ir.two_theta_deg, ir.intensity - ir.sigma, ir.intensity + ir.sigma,
                      color='#1f77b4', alpha=0.20, linewidth=0, label='+/-1 sigma')
-    ax.plot(ir.two_theta_deg, ir.intensity, color='#1f77b4', linewidth=1.3, label='intensity')
+    ax.plot(ir.two_theta_deg, ir.intensity, color='#1f77b4', linewidth=0.65, label='intensity')
     ax.set_xlabel('2theta (deg)')
     ax.set_ylabel('Intensity (a.u.)')
     ax.set_title(title if title is not None else f'integrated profile ({ir.method})')

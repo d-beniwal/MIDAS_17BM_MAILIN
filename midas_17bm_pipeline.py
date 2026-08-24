@@ -136,12 +136,18 @@ def main():
     parser.add_argument('--batch-dir', required=True, type=Path, help='folder holding the batch\'s .tif/.metadata files')
     parser.add_argument('--barcode', required=True, help='batch barcode, e.g. ANLXRD00012')
     parser.add_argument('--outfolder', type=Path, default=None, help='output folder (default: --batch-dir, i.e. write in place)')
-    parser.add_argument('--overwrite', action='store_true', help='redo calibration/integration even if outputs already exist')
-    parser.add_argument('--only-full-rings', type=int, choices=(0, 1), default=1,
-                         help='1 (default) = cap integration R_MAX to the radius where rings are still fully '
+    parser.add_argument('--overwrite', action='store_true', default=None,
+                         help='redo calibration/integration even if outputs already exist '
+                              f'(default: midas_17bm_config.OVERWRITE, currently {cfg.OVERWRITE})')
+    parser.add_argument('--only-full-rings', type=int, choices=(0, 1), default=None,
+                         help='1 = cap integration R_MAX to the radius where rings are still fully '
                               'on-detector (nearest-edge distance from the beam centre); 0 = use the full '
-                              'configured/auto range (midas_17bm_config.R_MAX_PX)')
+                              'configured/auto range (midas_17bm_config.R_MAX_PX) '
+                              f'(default: midas_17bm_config.ONLY_FULL_RINGS, currently {cfg.ONLY_FULL_RINGS})')
     args = parser.parse_args()
+
+    overwrite = cfg.OVERWRITE if args.overwrite is None else args.overwrite
+    only_full_rings = cfg.ONLY_FULL_RINGS if args.only_full_rings is None else args.only_full_rings
 
     batch_dir = args.batch_dir
     if not batch_dir.is_dir():
@@ -154,20 +160,20 @@ def main():
     if not pos0_tif.exists():
         sys.exit(f'error: calibrant frame not found: {pos0_tif}')
 
-    calib_json = _calibrate_pos0(pos0_tif, outfolder, args.overwrite)
+    calib_json = _calibrate_pos0(pos0_tif, outfolder, overwrite)
 
     sample_frames = _find_sample_frames(batch_dir, args.barcode)
     if not sample_frames:
         sys.exit(f'error: no sample frames ({args.barcode}_posN.tif, N>0) found in {batch_dir}')
 
     r_min = lib.resolve_r_min_px(calib_json, cfg.R_MIN_PX, cfg.R_MIN_2THETA_DEG)
-    if args.only_full_rings:
+    if only_full_rings:
         full_r_max = lib.full_ring_r_max_px(calib_json)
         r_max = full_r_max if cfg.R_MAX_PX is None else min(cfg.R_MAX_PX, full_r_max)
     else:
         r_max = cfg.R_MAX_PX
     print(f'\nintegration range: r_min={r_min:.2f} px, r_max={r_max} px '
-          f'(--only-full-rings={args.only_full_rings})')
+          f'(--only-full-rings={only_full_rings})')
 
     print(f'integrating {len(sample_frames)} sample frame(s) against {calib_json.name} '
           f'(detector mapping built once, reused for all)...')
@@ -186,7 +192,7 @@ def main():
     for pos, tif_path in sample_frames:
         print(f'\n[pos{pos}] {tif_path.name}')
         try:
-            _integrate_sample_frame(tif_path, context, outfolder, args.overwrite)
+            _integrate_sample_frame(tif_path, context, outfolder, overwrite)
         except Exception as exc:
             print(f'  ERROR integrating {tif_path.name}: {exc}', file=sys.stderr)
             failures.append(tif_path.name)

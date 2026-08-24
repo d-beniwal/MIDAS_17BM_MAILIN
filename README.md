@@ -83,6 +83,12 @@ Both provide `midas-suite` (which pulls in `midas_calibrate_v2`,
 `midas_calibrate_v2`'s auto-seeder imports `skimage` without declaring it as
 a dependency.
 
+They also provide what `mail_in_programs/` (the scan-request GUI) needs:
+`PyQt5` (GUI widgets/drag-drop), `pyepics` (EPICS channel access for
+`beamline17bm_real.py`), `SQLAlchemy` + `mysql-connector-python` (the
+`mysql+mysqlconnector://` scan-request database in `mailin.py`), `pandas`,
+and `Pillow`.
+
 ## Status
 
 Calibration and integration are implemented and validated on the 49 keV LaB6

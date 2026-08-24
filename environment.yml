@@ -1,5 +1,6 @@
 # Conda environment for the 17BM mail-in calibration/integration pipeline
-# (midas_17bm_pipeline.py / midas_17bm_lib.py / midas_17bm_config.py).
+# (midas_17bm_pipeline.py / midas_17bm_lib.py / midas_17bm_config.py) and the
+# mail-in scan-request GUI (mail_in_programs/mailin.py, beamline17bm_real.py).
 #
 # Create:   conda env create -f environment.yml
 # Update:   conda env update -f environment.yml --prune
@@ -21,3 +22,9 @@ dependencies:
       - h5py==3.16.0
       - hdf5plugin==6.0.0
       - midas-suite==0.10.1
+      - PyQt5==5.15.11
+      - pyepics==3.5.10
+      - SQLAlchemy==2.0.52
+      - mysql-connector-python==26.7.0
+      - pandas==3.0.5
+      - Pillow==12.3.0

@@ -85,6 +85,14 @@ POLARIZATION_PLANE_ETA_DEG = 0.0    # midas package default
 # in midas_17bm_lib.py for the file extension each one writes).
 INTEGRATION_OUTPUT_FORMATS = ['csv', 'xye', 'fxye', 'dat', 'esg', '2d_csv']
 
+# --- CLI-overridable batch pipeline flags ---------------------------------------
+# Defaults used when the corresponding midas_17bm_pipeline.py flag is NOT passed
+# on the command line. Precedence (lowest to highest): hardcoded fallback in
+# midas_17bm_pipeline.py < this config value < an explicit CLI flag.
+OVERWRITE        = True   # --overwrite: redo calibration/integration even if outputs already exist
+ONLY_FULL_RINGS  = 1       # --only-full-rings: 1 = cap integration R_MAX to the radius where rings are
+                            # still fully on-detector; 0 = use the full configured/auto range (R_MAX_PX above)
+
 # --- Batch pipeline (mail-in acquisition hook) ---------------------------------
 # Absolute path to the python interpreter of THIS analysis conda env (the one
 # with midas_calibrate_v2/midas_integrate_v2/torch installed, i.e. `midas_17bm`
