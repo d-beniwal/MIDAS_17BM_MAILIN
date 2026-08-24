@@ -93,5 +93,12 @@ and `Pillow`.
 
 Calibration and integration are implemented and validated on the 49 keV LaB6
 calibration set. Not yet done: applying a saved calibration to real *sample*
-frames (`apr/`/`Jun/`/`mar/`), dark-frame subtraction wiring, and bad-pixel
-mask support (`Jun/BadPixel_2026Jun19.json` is present but unused).
+frames (`apr/`/`Jun/`/`mar/`) and dark-frame subtraction wiring.
+
+Bad-pixel masking is supported: pass `--mask-file` to `midas_17bm_pipeline.py`
+(or set `MASK_FILE` in `midas_17bm_config.py`) with a `.tif`/`.tiff` or `.npy`
+file the same shape as the detector image, where 1/non-zero = bad pixel and
+0 = good pixel (default: no mask). The dense `BadPixel_*.tif` files under
+`apr/`/`Jun/` are usable as-is; the sibling `BadPixel_*.json` files (a list of
+individual bad-pixel coordinates, not a dense mask array) are not directly
+consumable by `--mask-file`.

@@ -70,6 +70,14 @@ POLYGON_N_JOBS           = -1         # only used when BINNING_METHOD == 'polygo
 ERROR_MODEL              = 'poisson'  # 'poisson' | 'azimuthal' | 'hybrid'  (hard/subpixel/polygon only)
 PIXEL_WEIGHTED_AVERAGING = True       # weight each eta slice by its pixel/area coverage when collapsing to 1D
 
+# --- Bad-pixel mask (optional) -------------------------------------------------
+# Path to a bad-pixel mask file (.tif/.tiff or .npy), same shape as the
+# detector image. Convention: 1/non-zero = bad pixel (excluded from
+# integration), 0 = good pixel -- matches midas_integrate_v2's own mask
+# convention, so no inversion is needed. None (default) -> no mask.
+# Overridable per run with midas_17bm_pipeline.py's --mask-file flag.
+MASK_FILE = None
+
 # --- Ring-overlay display -----------------------------------------------------
 RING_TWO_THETA_MAX_DEG = 25.0   # how far out (2theta, deg) to draw predicted rings
 

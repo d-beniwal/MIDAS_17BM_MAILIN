@@ -144,10 +144,15 @@ def main():
                               'on-detector (nearest-edge distance from the beam centre); 0 = use the full '
                               'configured/auto range (midas_17bm_config.R_MAX_PX) '
                               f'(default: midas_17bm_config.ONLY_FULL_RINGS, currently {cfg.ONLY_FULL_RINGS})')
+    parser.add_argument('--mask-file', type=Path, default=None,
+                         help='bad-pixel mask file (.tif/.tiff or .npy), same shape as the detector image; '
+                              '1/non-zero = bad pixel, 0 = good pixel '
+                              f'(default: midas_17bm_config.MASK_FILE, currently {cfg.MASK_FILE})')
     args = parser.parse_args()
 
     overwrite = cfg.OVERWRITE if args.overwrite is None else args.overwrite
     only_full_rings = cfg.ONLY_FULL_RINGS if args.only_full_rings is None else args.only_full_rings
+    mask_file = cfg.MASK_FILE if args.mask_file is None else args.mask_file
 
     batch_dir = args.batch_dir
     if not batch_dir.is_dir():
@@ -159,6 +164,11 @@ def main():
     pos0_tif = batch_dir / f'{args.barcode}_pos0.tif'
     if not pos0_tif.exists():
         sys.exit(f'error: calibrant frame not found: {pos0_tif}')
+
+    if mask_file is not None:
+        mask_file = Path(mask_file)
+        if not mask_file.exists():
+            sys.exit(f'error: --mask-file does not exist: {mask_file}')
 
     calib_json = _calibrate_pos0(pos0_tif, outfolder, overwrite)
 
@@ -174,6 +184,7 @@ def main():
         r_max = cfg.R_MAX_PX
     print(f'\nintegration range: r_min={r_min:.2f} px, r_max={r_max} px '
           f'(--only-full-rings={only_full_rings})')
+    print(f'mask file: {mask_file if mask_file is not None else "(none)"}')
 
     print(f'integrating {len(sample_frames)} sample frame(s) against {calib_json.name} '
           f'(detector mapping built once, reused for all)...')
@@ -186,6 +197,7 @@ def main():
         subpixel_k=cfg.SUBPIXEL_K, polygon_n_jobs=cfg.POLYGON_N_JOBS,
         polarization=cfg.POLARIZATION_CORRECTION, pol_fraction=cfg.POLARIZATION_FRACTION,
         pol_plane_eta_deg=cfg.POLARIZATION_PLANE_ETA_DEG,
+        mask=mask_file,
     )
 
     failures = []

@@ -37,6 +37,7 @@ from midas_integrate_v2.binning import (
     SoftBinGeometry, integrate_soft,
     SubpixelBinGeometry, integrate_subpixel,
     PolygonBinGeometry, integrate_polygon,
+    normalise_mask,
 )
 from midas_integrate_v2.binning.variance import (
     integrate_hard_with_variance,
@@ -324,6 +325,20 @@ class IntegrationResult:
     method: str
 
 
+def load_mask_file(mask_path) -> np.ndarray:
+    """Load a bad-pixel mask from disk: `.tif`/`.tiff` (via tifffile) or
+    `.npy` (via numpy). Convention: 1/non-zero = bad pixel, 0 = good pixel
+    -- matches midas_integrate_v2.binning.normalise_mask, so the raw loaded
+    array can be passed straight through to it without inversion."""
+    mask_path = Path(mask_path)
+    suffix = mask_path.suffix.lower()
+    if suffix in ('.tif', '.tiff'):
+        return tifffile.imread(mask_path)
+    if suffix == '.npy':
+        return np.load(mask_path)
+    raise ValueError(f'unsupported mask file type {suffix!r} ({mask_path}) -- expected .tif/.tiff/.npy')
+
+
 @dataclass
 class IntegrationContext:
     """The geometry/binning setup for a calibration -- expensive to build
@@ -335,6 +350,8 @@ class IntegrationContext:
     binning_cfg: dict
     method: str
     pol_factor: Optional[torch.Tensor] = None
+    mask: Optional[torch.Tensor] = None  # bool, True = bad pixel; only used at integrate time for method='soft'
+                                          # (hard/subpixel/polygon bake the mask into `geom` at build time instead)
 
 
 def build_integration_context(calibration_json_path, *,
@@ -342,16 +359,33 @@ def build_integration_context(calibration_json_path, *,
                                r_bin_size=1.0, eta_bin_size=5.0,
                                r_min=10.0, r_max=None, eta_min=-180.0, eta_max=180.0,
                                subpixel_k=2, polygon_n_jobs=-1,
-                               polarization=False, pol_fraction=0.99, pol_plane_eta_deg=0.0) -> IntegrationContext:
+                               polarization=False, pol_fraction=0.99, pol_plane_eta_deg=0.0,
+                               mask=None) -> IntegrationContext:
     """Build the (spec, detector-mapping) pair for one calibration once, so
-    it can be reused across many frames via integrate_with_context()."""
+    it can be reused across many frames via integrate_with_context().
+
+    `mask`: optional bad-pixel mask -- a path to a `.tif`/`.npy` file, or an
+    already-loaded 2D array/tensor shaped (NrPixelsZ, NrPixelsY). Convention:
+    1/non-zero = bad pixel, 0 = good pixel. None (default) -> no mask.
+    """
     spec = spec_from_calibration_json(
         calibration_json_path, RBinSize=r_bin_size, EtaBinSize=eta_bin_size,
         RMin=r_min, RMax=r_max, EtaMin=eta_min, EtaMax=eta_max,
     )
+
+    mask_bool = None
+    if mask is not None:
+        if isinstance(mask, (str, Path)):
+            mask = load_mask_file(mask)
+        mask_bool = normalise_mask(mask, NrPixelsY=spec.NrPixelsY, NrPixelsZ=spec.NrPixelsZ)
+
     binning_cfg = _BINNING_METHODS[method]
     build_kwargs = {'K': subpixel_k} if method == 'subpixel' else ({'n_jobs': polygon_n_jobs} if method == 'polygon' else {})
+    if method != 'soft' and mask_bool is not None:
+        build_kwargs['mask'] = mask_bool
     geom = binning_cfg['geometry'].from_spec(spec, **build_kwargs)
+
+    mask_t = torch.from_numpy(mask_bool) if (method == 'soft' and mask_bool is not None) else None
 
     pol_factor = None
     if polarization:
@@ -362,7 +396,8 @@ def build_integration_context(calibration_json_path, *,
             pol_plane_eta_deg=torch.as_tensor(pol_plane_eta_deg, dtype=torch.float64),
         ).detach()
 
-    return IntegrationContext(spec=spec, geom=geom, binning_cfg=binning_cfg, method=method, pol_factor=pol_factor)
+    return IntegrationContext(spec=spec, geom=geom, binning_cfg=binning_cfg, method=method,
+                               pol_factor=pol_factor, mask=mask_t)
 
 
 def integrate_with_context(image, context: IntegrationContext, *,
@@ -379,6 +414,16 @@ def integrate_with_context(image, context: IntegrationContext, *,
     if context.pol_factor is not None:
         image_t = image_t / context.pol_factor.clamp(min=1e-6)
 
+    # hard/subpixel/polygon geometries bake the mask into `geom` at build
+    # time (masked pixels never appear in pix_idx/flat_bin). 'soft' has no
+    # such geometry-level concept, so mask it here: zero the bad pixels in
+    # both the image and the per-pixel weight below, so they never
+    # contribute to a bin's intensity or its normalisation.
+    good_px = None
+    if context.mask is not None:
+        good_px = (~context.mask).to(dtype=image_t.dtype)
+        image_t = image_t * good_px
+
     if cfg['integrate_var'] is not None:
         mean_cake, sigma_cake = cfg['integrate_var'](image_t, geom, error_model=error_model, empty_bin_value=0.0)
     else:
@@ -387,7 +432,8 @@ def integrate_with_context(image, context: IntegrationContext, *,
 
     if pixel_weighted_averaging:
         norm_kwargs = {'normalize': False} if method != 'soft' else {}
-        weight_cake = cfg['integrate'](torch.ones_like(image_t), geom, **norm_kwargs)
+        weight_image = torch.ones_like(image_t) if good_px is None else good_px
+        weight_cake = cfg['integrate'](weight_image, geom, **norm_kwargs)
         wsum = weight_cake.sum(dim=0).clamp(min=1e-12)
         intensity = (weight_cake * mean_cake).sum(dim=0) / wsum
         sigma = torch.sqrt((weight_cake ** 2 * sigma_cake ** 2).sum(dim=0)) / wsum
@@ -416,7 +462,8 @@ def integrate_frame(image, calibration_json_path, *,
                      error_model='poisson',
                      pixel_weighted_averaging=True,
                      subpixel_k=2, polygon_n_jobs=-1,
-                     polarization=False, pol_fraction=0.99, pol_plane_eta_deg=0.0) -> IntegrationResult:
+                     polarization=False, pol_fraction=0.99, pol_plane_eta_deg=0.0,
+                     mask=None) -> IntegrationResult:
     """Integrate `image` using the geometry saved in `calibration_json_path`.
 
     Convenience wrapper for the single-frame case (builds a fresh
@@ -429,6 +476,7 @@ def integrate_frame(image, calibration_json_path, *,
         r_min=r_min, r_max=r_max, eta_min=eta_min, eta_max=eta_max,
         subpixel_k=subpixel_k, polygon_n_jobs=polygon_n_jobs,
         polarization=polarization, pol_fraction=pol_fraction, pol_plane_eta_deg=pol_plane_eta_deg,
+        mask=mask,
     )
     return integrate_with_context(image, context, error_model=error_model,
                                    pixel_weighted_averaging=pixel_weighted_averaging)
