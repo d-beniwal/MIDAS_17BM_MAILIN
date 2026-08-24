@@ -1,5 +1,5 @@
 # Conda environment for the 17BM mail-in calibration/integration pipeline
-# (calibrate.py / integrate.py / pipeline_lib.py / pipeline_config.py).
+# (midas_17bm_pipeline.py / midas_17bm_lib.py / midas_17bm_config.py).
 #
 # Create:   conda env create -f environment.yml
 # Update:   conda env update -f environment.yml --prune

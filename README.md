@@ -7,49 +7,46 @@ standard.
 
 ## What's here
 
-Two command-line tools built on [MIDAS](https://github.com/marinerhemant/MIDAS)'s
-`midas_calibrate_v2` / `midas_integrate_v2` packages, sharing a single editable
-config file:
+A batch CLI built on [MIDAS](https://github.com/marinerhemant/MIDAS)'s
+`midas_calibrate_v2` / `midas_integrate_v2` packages, driven by a single
+editable config file:
 
-- **`pipeline_config.py`** — edit this to change the calibrant, calibration
+- **`midas_17bm_config.py`** — edit this to change the calibrant, calibration
   tuning (e.g. distortion model), or integration binning/output settings.
-  Both CLIs import it directly.
-- **`pipeline_lib.py`** — the shared implementation
-  (`calibrate_lab6()`, `integrate_frame()`, output writers, plotting) used by
-  both CLIs.
-- **`calibrate.py`** — calibrates a LaB6 (or other configured calibrant)
-  frame. Wavelength and pixel pitch come from the `.tif`'s `.metadata`
-  sidecar; beam centre and sample-to-detector distance are **always** found
-  automatically by `midas_calibrate_v2`'s auto-seeder from the ring pattern
-  in the image itself (the sidecar's own geometry fields are unreliable at
-  this beamline).
-- **`integrate.py`** — integrates any frame (calibrant or sample) against a
-  saved calibration, with a choice of 4 binning kernels and export to 6
-  output formats (csv, xye, fxye/GSAS, dat/PDF, esg/MAUD, full 2D cake).
+  `midas_17bm_pipeline.py` imports it directly.
+- **`midas_17bm_lib.py`** — the shared implementation
+  (`calibrate_lab6()`, `build_integration_context()`/`integrate_with_context()`,
+  output writers, plotting) used by the CLI.
+- **`midas_17bm_pipeline.py`** — calibrates one batch's LaB6 (or other configured
+  calibrant) `pos0` frame, then integrates every other `posN` sample frame in
+  that batch against it, building the detector mapping once and reusing it
+  across all frames. Wavelength and pixel pitch come from the `.tif`'s
+  `.metadata` sidecar; beam centre and sample-to-detector distance are
+  **always** found automatically by `midas_calibrate_v2`'s auto-seeder from
+  the ring pattern in the image itself (the sidecar's own geometry fields are
+  unreliable at this beamline). Integration supports a choice of 4 binning
+  kernels and export to 6 output formats (csv, xye, fxye/GSAS, dat/PDF,
+  esg/MAUD, full 2D cake). This is also what
+  `mail_in_programs/mailin.py` launches automatically in the background
+  after each batch finishes acquisition.
 
 ### Usage
 
 ```bash
-# Calibrate one LaB6 frame -> <outfolder>/<stem>_midas_calib.{json,png}
-python calibrate.py \
-    --infile beamline_data/calibration/wavelength/49keV/Lab6_d1000_20260212_49keV-00000.tif \
-    --outfolder pipeline_output/calib
-#   --overwrite   recalibrate even if the output .json already exists
-
-# Integrate a frame against that calibration -> <outfolder>/<stem>.<ext> per format
-python integrate.py \
-    --incalibfile pipeline_output/calib/Lab6_d1000_20260212_49keV-00000_midas_calib.json \
-    --infile beamline_data/calibration/wavelength/49keV/Lab6_d1000_20260212_49keV-00000.tif \
-    --outfolder pipeline_output/integ
-#   --plot 1      also save a quick I vs 2theta lineout PNG (default 0 = off)
+# Calibrate <barcode>_pos0.tif, then integrate every <barcode>_posN.tif (N>0)
+# in --batch-dir against it -> outputs written into --batch-dir (or --outfolder)
+python midas_17bm_pipeline.py \
+    --batch-dir beamline_data/calibration/wavelength/49keV \
+    --barcode ANLXRD00012
+#   --outfolder PATH        write outputs elsewhere (default: --batch-dir, in place)
+#   --overwrite             redo calibration/integration even if outputs already exist
+#   --only-full-rings 0     integrate out to the full configured R_MAX instead of
+#                           capping at the largest ring that stays on-detector (default 1)
 ```
 
-See `test_analysis/commands.md` for a runnable, git-tracked example against
-`test_data/` (no `beamline_data/` access needed).
-
-`calibrate.py` always writes a ring-overlay PNG (predicted rings, from the
-full fitted geometry, over the raw image) next to the calibration JSON;
-`integrate.py` writes it only when `--plot 1` is passed.
+`midas_17bm_pipeline.py` always writes a ring-overlay PNG (predicted rings, from
+the full fitted geometry, over the raw image) next to the calibration JSON,
+and an I vs 2theta lineout PNG next to each integrated sample frame.
 
 - **`archive/`** *(gitignored)* — earlier draft pipelines, kept locally for
   reference, including the exploratory notebook these CLIs were built from
@@ -60,14 +57,6 @@ full fitted geometry, over the raw image) next to the calibration JSON;
   sidecars, organized by acquisition session (`apr/`, `Jun/`, `mar/`) and by
   calibration purpose (`calibration/wavelength/`, `calibration/distance/`).
   Too large for git; lives on the local workstation only.
-
-- **`test_data/`** — one LaB6 calibration frame (`.tif` + `.tif.metadata`
-  sidecar) copied out of `beamline_data/`, checked into git so the pipeline
-  can be exercised without access to the full (gitignored) dataset.
-
-- **`test_analysis/`** — output of running `calibrate.py`/`integrate.py`
-  against `test_data/`, checked into git as a reference/smoke-test result.
-  `commands.md` documents the exact commands and expected values.
 
 ## Requirements
 

@@ -1,5 +1,9 @@
 import sys
+import os
 import time
+import subprocess
+from pathlib import Path
+from datetime import datetime
 import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QComboBox, QMessageBox, QMenu, QInputDialog, QDoubleSpinBox, QDialogButtonBox,
@@ -14,6 +18,19 @@ from beamline17bm_simulated import Beamline17BMSim
 from beamline17bm_real import Beamline17BM
 from collections import defaultdict
 import pandas as pd
+
+# --- Batch analysis pipeline hook -------------------------------------------
+# midas_17bm_pipeline.py (repo root) needs midas_*/torch,
+# which live in a DIFFERENT conda env than this GUI (PyQt5 + epics) -- so the
+# analysis work always runs in its own subprocess, launched with the
+# interpreter path from midas_17bm_config.BATCH_ANALYSIS_PYTHON. midas_17bm_config.py
+# itself has no heavy imports, so reading that one setting here is safe.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+import midas_17bm_config as _pipeline_cfg
+
+_BATCH_PIPELINE_SCRIPT = _REPO_ROOT / "midas_17bm_pipeline.py"
 
 
 
@@ -305,6 +322,40 @@ class BarcodeSearchApp(QMainWindow):
     def update_status(self, message):
         self.status_label.setText(f"Status: {message}")
         QApplication.processEvents()  # ensure immediate GUI update
+
+    def launch_batch_pipeline(self, barcode):
+        """Kick off midas_17bm_pipeline.py (calibrate + integrate) for a
+        just-completed batch as a detached background process. Never blocks
+        and never raises into the acquisition flow -- a failure here only
+        means analysis didn't start, not that data collection is affected.
+        """
+        if not barcode:
+            return
+        try:
+            # Same year/month directory layout Beamline17BM.TurnOnSave() /
+            # write_single_entry() already write into -- duplicated here
+            # read-only, beamline17bm_real.py itself is not touched.
+            now = datetime.now()
+            batch_dir = os.path.join(r"Y:\mail_in", str(now.year), now.strftime("%b"))
+            log_path = os.path.join(batch_dir, f"{barcode}_batch_pipeline.log")
+            os.makedirs(batch_dir, exist_ok=True)
+
+            cmd = [
+                _pipeline_cfg.BATCH_ANALYSIS_PYTHON, str(_BATCH_PIPELINE_SCRIPT),
+                "--batch-dir", batch_dir, "--barcode", barcode,
+            ]
+            popen_kwargs = dict(cwd=str(_REPO_ROOT))
+            if os.name == "nt":
+                popen_kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                popen_kwargs["start_new_session"] = True
+
+            with open(log_path, "a") as logf:
+                subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT, **popen_kwargs)
+
+            self.update_status(f"Started background calibration/integration for batch {barcode}")
+        except Exception as exc:
+            print(f"[WARN] Failed to launch batch pipeline for batch {barcode}: {exc}")
 
     def clear_table(self):
         self.data = []
@@ -979,6 +1030,13 @@ class BarcodeSearchApp(QMainWindow):
         self.update_status("Running all scans")
         first=True
 
+        # Batch (barcode) completion tracking, purely for deciding when to kick
+        # off background calibration/integration -- does not affect acquisition.
+        batch_totals = defaultdict(int)
+        for idx in run_entries:
+            batch_totals[self.data[idx]["barcode"]] += 1
+        batch_seen = defaultdict(int)
+
         for i, row_idx in enumerate(run_entries):
             self.wait_if_paused(row_idx)
 
@@ -990,7 +1048,13 @@ class BarcodeSearchApp(QMainWindow):
 
 
             entry = self.data[row_idx]
+            barcode = entry["barcode"]
+            batch_seen[barcode] += 1
+            batch_done = batch_seen[barcode] >= batch_totals[barcode]
+
             if entry["status"] == 1 or entry["exposure"] == "TBD":
+                if batch_done:
+                    self.launch_batch_pipeline(barcode)
                 continue
             self.update_status(f"Running sample {entry['barcode']} position {entry['position']}")
             print(f"Running: Barcode: {entry['barcode']}, "
@@ -1056,6 +1120,9 @@ class BarcodeSearchApp(QMainWindow):
                     item.setBackground(QColor("white"))
 
             QApplication.processEvents()
+
+            if batch_done:
+                self.launch_batch_pipeline(barcode)
 
         self.update_progress(100)
         self.update_status("Run complete")
@@ -1220,7 +1287,12 @@ class BarcodeSearchApp(QMainWindow):
                         item.setBackground(QColor("white"))
 
                 QApplication.processEvents()
-                
+
+            # Batch (cartridge/barcode) fully measured -- kick off calibration
+            # + integration for it in the background before moving on.
+            if group:
+                self.launch_batch_pipeline(group[0][1]["barcode"])
+
         self.update_progress(100)
         self.update_status("Prescan & Run Complete")
         print("=== PRESCAN & RUN COMPLETE ===")
