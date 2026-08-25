@@ -130,7 +130,7 @@ MASK_FILE = None
 # Example -- two independent wedges (right-horizontal shadow + a separate
 # seam near the bottom of the detector, eta~0):
 #   ETA_EXCLUDE_DEG = [(85.0, 95.0), (-5.0, 5.0)]
-ETA_EXCLUDE_DEG = None
+ETA_EXCLUDE_DEG = [(75,105)]
 
 # --- Ring-overlay display -----------------------------------------------------
 RING_TWO_THETA_MAX_DEG = 25.0   # how far out (2theta, deg) to draw predicted rings
@@ -163,4 +163,4 @@ ONLY_FULL_RINGS  = 1       # --only-full-rings: 1 = cap integration R_MAX to the
 # launch midas_17bm_pipeline.py with this explicit interpreter rather than its own
 # sys.executable. On the real beamline control PC this will be a Windows path
 # to .../envs/midas_17bm/python.exe -- UPDATE THIS before deploying.
-BATCH_ANALYSIS_PYTHON = r"/Users/dbeniwal/anaconda3/envs/midas_17bm/bin/python"
+BATCH_ANALYSIS_PYTHON = r"C:\Users\17bmuser\AppData\Local\miniconda3\envs\midas_17bm\bin\python"
