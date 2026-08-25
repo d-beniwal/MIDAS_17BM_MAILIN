@@ -201,6 +201,12 @@ def main():
         mask=mask_file, eta_exclude_deg=cfg.ETA_EXCLUDE_DEG,
     )
 
+    print(f'\n[pos0] {pos0_tif.name} (calibrant)')
+    try:
+        _integrate_sample_frame(pos0_tif, context, outfolder, overwrite)
+    except Exception as exc:
+        print(f'  ERROR integrating {pos0_tif.name}: {exc}', file=sys.stderr)
+
     failures = []
     for pos, tif_path in sample_frames:
         print(f'\n[pos{pos}] {tif_path.name}')
