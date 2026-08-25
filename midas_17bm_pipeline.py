@@ -185,6 +185,7 @@ def main():
     print(f'\nintegration range: r_min={r_min:.2f} px, r_max={r_max} px '
           f'(--only-full-rings={only_full_rings})')
     print(f'mask file: {mask_file if mask_file is not None else "(none)"}')
+    print(f'eta exclude wedges (deg): {cfg.ETA_EXCLUDE_DEG if cfg.ETA_EXCLUDE_DEG else "(none)"}')
 
     print(f'integrating {len(sample_frames)} sample frame(s) against {calib_json.name} '
           f'(detector mapping built once, reused for all)...')
@@ -197,7 +198,7 @@ def main():
         subpixel_k=cfg.SUBPIXEL_K, polygon_n_jobs=cfg.POLYGON_N_JOBS,
         polarization=cfg.POLARIZATION_CORRECTION, pol_fraction=cfg.POLARIZATION_FRACTION,
         pol_plane_eta_deg=cfg.POLARIZATION_PLANE_ETA_DEG,
-        mask=mask_file,
+        mask=mask_file, eta_exclude_deg=cfg.ETA_EXCLUDE_DEG,
     )
 
     failures = []

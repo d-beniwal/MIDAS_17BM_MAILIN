@@ -78,6 +78,60 @@ PIXEL_WEIGHTED_AVERAGING = True       # weight each eta slice by its pixel/area 
 # Overridable per run with midas_17bm_pipeline.py's --mask-file flag.
 MASK_FILE = None
 
+# --- Azimuthal (eta) exclusion wedges (optional) -------------------------------
+# Blank out one or more angular wedges from the integration -- e.g. a
+# beamstop-arm shadow or a detector-tile seam that always falls at the same
+# eta -- WITHOUT cropping the overall ETA_MIN_DEG/ETA_MAX_DEG coverage above
+# (that pair sets a single contiguous window; this instead punches a hole(s)
+# out of whatever window is active). Internally this is just another
+# bad-pixel mask: the excluded wedge(s) are OR'd together with MASK_FILE
+# above and passed to the same `mask=` machinery, so excluded pixels are
+# treated exactly like bad pixels (dropped from every bin they'd otherwise
+# fall in).
+#
+# eta convention -- this is THE eta used everywhere else in this pipeline
+# (ETA_MIN_DEG/ETA_MAX_DEG above, ETA_BIN_SIZE_DEG binning,
+# POLARIZATION_PLANE_ETA_DEG below, and the eta axis of the '2d_csv' cake
+# output), because midas_17bm_lib.build_eta_exclusion_mask() computes these
+# wedges from midas_integrate_v2's own per-pixel eval_pixel_REta(spec) field
+# -- the exact same array HardBinGeometry/SubpixelBinGeometry/etc. bin
+# against. This was verified numerically (not assumed) against
+# midas_calibrate_v2.forward.geometry.pixel_to_REta with zero tilts:
+#   eta =    0 deg -> straight DOWN from the beam centre (as drawn on screen
+#                     by render_calibration_overlay_png(), i.e. increasing
+#                     row/Z)
+#   eta =  +90 deg -> RIGHT (increasing column/Y)
+#   eta = +/-180   -> UP
+#   eta =  -90 deg -> LEFT
+# eta increases counterclockwise on screen. NOTE: this is NOT the same eta
+# as midas_integrate_v2.dac.build_gasket_mask (a DAC-gasket-specific helper)
+# -- that function's eta is a mirror image of this one
+# (eta_gasket = 90 - eta_here), so do not reuse gasket-mask angles here or
+# vice versa.
+#
+# None (default) -> no exclusion. Otherwise a list of wedges, each either
+#   (eta_min_deg, eta_max_deg)
+# or
+#   (eta_min_deg, eta_max_deg, symmetry)
+# `symmetry` (default 'single' when omitted):
+#   'single'    -- only the given wedge
+#   'two_fold'  -- also excludes the 180 deg-opposite wedge
+#   'four_fold' -- also excludes the +/-90 deg wedges
+#
+# Example -- exclude +/-5 deg about horizontal on the right side only
+# (the case this knob was added for -- note the wedge is centred on +90,
+# NOT 0, since +90 is "right" in this convention):
+#   ETA_EXCLUDE_DEG = [(85.0, 95.0)]
+#
+# Example -- same +/-5 deg band on BOTH the right and left (mirror-image
+# shadow, e.g. a beamstop arm crossing straight through the beam centre):
+#   ETA_EXCLUDE_DEG = [(85.0, 95.0, 'two_fold')]
+#
+# Example -- two independent wedges (right-horizontal shadow + a separate
+# seam near the bottom of the detector, eta~0):
+#   ETA_EXCLUDE_DEG = [(85.0, 95.0), (-5.0, 5.0)]
+ETA_EXCLUDE_DEG = None
+
 # --- Ring-overlay display -----------------------------------------------------
 RING_TWO_THETA_MAX_DEG = 25.0   # how far out (2theta, deg) to draw predicted rings
 

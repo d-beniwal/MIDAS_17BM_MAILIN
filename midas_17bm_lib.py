@@ -339,6 +339,51 @@ def load_mask_file(mask_path) -> np.ndarray:
     raise ValueError(f'unsupported mask file type {suffix!r} ({mask_path}) -- expected .tif/.tiff/.npy')
 
 
+def build_eta_exclusion_mask(spec, eta_exclude_deg) -> np.ndarray:
+    """Build a (NrPixelsZ, NrPixelsY) bool mask, True for every pixel whose
+    azimuthal angle eta falls inside one of the given wedges.
+
+    Uses `eval_pixel_REta(spec)`'s own eta_deg field -- the exact same
+    per-pixel eta that HardBinGeometry/SubpixelBinGeometry/etc. use to bin,
+    that ETA_MIN_DEG/ETA_MAX_DEG crop against, that POLARIZATION_PLANE_ETA_DEG
+    is defined in, and that the '2d_csv' cake output's eta axis reports.
+    That is deliberate and load-bearing: do NOT swap this for
+    midas_integrate_v2.dac.build_gasket_mask, which computes a DIFFERENT eta
+    (verified empirically -- eta_gasket and this module's eta are related by
+    eta_here = 90 - eta_gasket, a mirror, not just an offset). See
+    midas_17bm_config.ETA_EXCLUDE_DEG for the verified eta=0/+90/180/-90
+    screen directions.
+
+    `eta_exclude_deg` is a list of `(eta_min_deg, eta_max_deg)` or
+    `(eta_min_deg, eta_max_deg, symmetry)` tuples. `symmetry` (default
+    'single') mirrors the wedge the same way midas_integrate_v2.dac's
+    build_gasket_mask does: 'two_fold' also excludes the 180deg-opposite
+    wedge, 'four_fold' additionally excludes the +/-90deg wedges. Wedges are
+    OR'd together. True pixels here mean "excluded", the same convention as
+    the bad-pixel mask -- the two are simply OR'd together before
+    integration."""
+    eta_deg = eval_pixel_REta(spec)[1].detach().cpu().numpy()
+
+    def _in_wedge(eta_lo, eta_hi):
+        width = (eta_hi - eta_lo) % 360.0
+        if width == 0.0 and eta_hi != eta_lo:
+            width = 360.0
+        return ((eta_deg - eta_lo) % 360.0) <= width
+
+    exclude = np.zeros_like(eta_deg, dtype=bool)
+    for wedge in eta_exclude_deg:
+        eta_lo, eta_hi = float(wedge[0]), float(wedge[1])
+        symmetry = wedge[2] if len(wedge) > 2 else 'single'
+        w = _in_wedge(eta_lo, eta_hi)
+        if symmetry in ('two_fold', 'four_fold'):
+            w |= _in_wedge(eta_lo + 180.0, eta_hi + 180.0)
+        if symmetry == 'four_fold':
+            w |= _in_wedge(eta_lo + 90.0, eta_hi + 90.0)
+            w |= _in_wedge(eta_lo + 270.0, eta_hi + 270.0)
+        exclude |= w
+    return exclude
+
+
 @dataclass
 class IntegrationContext:
     """The geometry/binning setup for a calibration -- expensive to build
@@ -360,13 +405,20 @@ def build_integration_context(calibration_json_path, *,
                                r_min=10.0, r_max=None, eta_min=-180.0, eta_max=180.0,
                                subpixel_k=2, polygon_n_jobs=-1,
                                polarization=False, pol_fraction=0.99, pol_plane_eta_deg=0.0,
-                               mask=None) -> IntegrationContext:
+                               mask=None, eta_exclude_deg=None) -> IntegrationContext:
     """Build the (spec, detector-mapping) pair for one calibration once, so
     it can be reused across many frames via integrate_with_context().
 
     `mask`: optional bad-pixel mask -- a path to a `.tif`/`.npy` file, or an
     already-loaded 2D array/tensor shaped (NrPixelsZ, NrPixelsY). Convention:
     1/non-zero = bad pixel, 0 = good pixel. None (default) -> no mask.
+
+    `eta_exclude_deg`: optional list of azimuthal wedges to blank out of the
+    integration (e.g. beamstop-arm shadow, detector-tile seam), on top of
+    (eta_min, eta_max) above which just crops the overall coverage. See
+    build_eta_exclusion_mask() and midas_17bm_config.ETA_EXCLUDE_DEG for the
+    wedge format and the eta=0 convention. OR'd together with `mask`. None
+    (default) -> no exclusion wedges.
     """
     spec = spec_from_calibration_json(
         calibration_json_path, RBinSize=r_bin_size, EtaBinSize=eta_bin_size,
@@ -378,6 +430,10 @@ def build_integration_context(calibration_json_path, *,
         if isinstance(mask, (str, Path)):
             mask = load_mask_file(mask)
         mask_bool = normalise_mask(mask, NrPixelsY=spec.NrPixelsY, NrPixelsZ=spec.NrPixelsZ)
+
+    if eta_exclude_deg:
+        exclude_bool = build_eta_exclusion_mask(spec, eta_exclude_deg)
+        mask_bool = exclude_bool if mask_bool is None else (mask_bool | exclude_bool)
 
     binning_cfg = _BINNING_METHODS[method]
     build_kwargs = {'K': subpixel_k} if method == 'subpixel' else ({'n_jobs': polygon_n_jobs} if method == 'polygon' else {})
