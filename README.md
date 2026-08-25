@@ -27,8 +27,8 @@ editable config file:
   unreliable at this beamline). Integration supports a choice of 4 binning
   kernels and export to 6 output formats (csv, xye, fxye/GSAS, dat/PDF,
   esg/MAUD, full 2D cake). This is also what
-  `mail_in_programs/mailin.py` launches automatically in the background
-  after each batch finishes acquisition.
+  `mailin.py` launches automatically in the background after each batch
+  finishes acquisition.
 
 ### Usage
 
@@ -47,6 +47,22 @@ python midas_17bm_pipeline.py \
 `midas_17bm_pipeline.py` always writes a ring-overlay PNG (predicted rings, from
 the full fitted geometry, over the raw image) next to the calibration JSON,
 and an I vs 2theta lineout PNG next to each integrated sample frame.
+
+Alongside the pipeline, the mail-in scan-request GUI:
+
+- **`mailin.py`** — the PyQt5 GUI: barcode search, cartridge/sample tracking
+  against the scan-request DB, and the `launch_batch_pipeline()` hook that
+  kicks off `midas_17bm_pipeline.py` after each batch.
+- **`beamline17bm_real.py`** — EPICS (`pyepics`) control of the real 17-BM
+  detector/motors/filters/shutter.
+- **`beamline17bm_simulated.py`** — a stand-in for `beamline17bm_real.py`
+  used when `BarcodeSearchApp.simulation_mode` is `True` (no EPICS needed).
+- **`models.py`** — SQLAlchemy ORM classes for the scan-request DB
+  (users, samples, cartridges, proposals, scan requests/params).
+- **`defaults.py`** — static lookup tables (`models.py`) draws on:
+  cartridge types/sizes and per-beamline metadata.
+- **`hotpixel.py`** — standalone PyQt5 tool to view a `.tif` frame and
+  flag/export hot pixels; not wired into `mailin.py` or the batch pipeline.
 
 - **`archive/`** *(gitignored)* — earlier draft pipelines, kept locally for
   reference, including the exploratory notebook these CLIs were built from
@@ -83,11 +99,52 @@ Both provide `midas-suite` (which pulls in `midas_calibrate_v2`,
 `midas_calibrate_v2`'s auto-seeder imports `skimage` without declaring it as
 a dependency.
 
-They also provide what `mail_in_programs/` (the scan-request GUI) needs:
-`PyQt5` (GUI widgets/drag-drop), `pyepics` (EPICS channel access for
+They also provide what the scan-request GUI (`mailin.py`, `beamline17bm_real.py`,
+`beamline17bm_simulated.py`, `models.py`, `defaults.py`) needs: `PyQt5` (GUI
+widgets/drag-drop), `pyepics` (EPICS channel access for
 `beamline17bm_real.py`), `SQLAlchemy` + `mysql-connector-python` (the
 `mysql+mysqlconnector://` scan-request database in `mailin.py`), `pandas`,
 and `Pillow`.
+
+## Beamline workstation setup
+
+The GUI (`mailin.py`) and the analysis pipeline it launches are developed
+off-site, so several things are hardcoded to placeholder/dev values and
+**must be changed on the actual 17-BM workstation** before a real run:
+
+- **`BATCH_ANALYSIS_PYTHON` in `midas_17bm_config.py`** — currently a
+  placeholder Windows path
+  (`C:\Users\17bmuser\AppData\Local\miniconda3\envs\midas_17bm\bin\python`).
+  `mailin.py` shells out to this interpreter to run
+  `midas_17bm_pipeline.py` in the background after each batch (kept
+  separate from whatever environment runs the GUI itself, since the GUI
+  only needs PyQt5/pyepics/SQLAlchemy while the pipeline needs the much
+  heavier `midas-suite`/`torch`/`scikit-image` stack). Confirm it points
+  at the actual `python.exe` inside the `midas_17bm` conda env **on the
+  workstation** (e.g. `conda env create -f environment.yml` run there).
+- **`DATABASE_URL` in `BarcodeSearchApp.initDB()`** — hardcoded to
+  `mysql+mysqlconnector://11bm:staff11bm@s11bmsrv1/mailin`, i.e. the
+  **11-BM** scan-request database host/credentials. This must be updated
+  to 17-BM's own MySQL server, user, and password (and that database
+  needs the `mailin` schema `models.py` defines already provisioned).
+- **`Y:\mail_in\<year>\<Mon>` batch directory** — hardcoded (in both
+  `beamline17bm_real.py`'s save/scan routines and duplicated in
+  `mailin.py`'s `launch_batch_pipeline()`) as a Windows drive letter. The
+  workstation needs a `Y:` drive mapped to wherever detector frames
+  actually land, and both files' occurrences of this path must agree if
+  it ever changes.
+- **EPICS connectivity** — `beamline17bm_real.py` talks to hardcoded
+  17-BM PV names (`17bmVarex:...`, `17bm:m10`/`m33`, `17bm:XiaPfcu2:...`,
+  `PB:17BM:STA_*`, `17bm:scaler1...`) via `pyepics`. The workstation must
+  be on the 17-BM control network with Channel Access reaching those
+  IOCs (standard `EPICS_CA_ADDR_LIST`/`EPICS_CA_AUTO_ADDR_LIST` env vars
+  set as they are for any other 17-BM control-room machine); confirm
+  `BarcodeSearchApp.simulation_mode` in `mailin.py` is `False` so it
+  drives `Beamline17BM` (real EPICS) rather than the simulated stand-in.
+- **`--mask-file` / `MASK_FILE`** in `midas_17bm_config.py` — if a
+  bad-pixel mask should be applied by default, point this at that
+  workstation's current `BadPixel_*.tif` (dense mask, not the
+  coordinate-list `.json` sibling).
 
 ## Status
 
