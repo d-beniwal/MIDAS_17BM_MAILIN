@@ -149,7 +149,8 @@ def _result_from_cached_json(calibration_json_path: Path):
 
 
 def calibrate_lab6(tif_path, output_dir, *, dark_path=None, calibrant='LaB6',
-                    overwrite=False, default_px_um=150.0, **calibrate_kwargs) -> CalibrationBundle:
+                    overwrite=False, default_px_um=150.0, seed_kwargs=None,
+                    **calibrate_kwargs) -> CalibrationBundle:
     """Calibrate one LaB6 (or other registered/custom calibrant) frame end to end.
 
     Beam centre and Lsd are ALWAYS found by auto_seed from the ring pattern in
@@ -161,6 +162,14 @@ def calibrate_lab6(tif_path, output_dir, *, dark_path=None, calibrant='LaB6',
     midas_calibrate_v2.CALIBRANTS) or a custom lattice dict
     ({'sg', 'a', 'b', 'c', 'alpha', 'beta', 'gamma'}) -- both flow straight
     into make_seed()/calibrate() unchanged.
+
+    `seed_kwargs` -- optional dict forwarded to auto_seed.make_seed() (e.g.
+    {'dilation_radius': 1, 'min_arc_fraction': 0.02}). make_seed's defaults
+    assume long, continuous ring arcs; a spotty calibrant pattern (coarse
+    powder / limited grain statistics) can fragment every ring below the
+    default 10%-of-detector-size min-arc-length, raising "no arcs detected"
+    even though the rings are visibly present. None (default) -> make_seed's
+    own defaults, unchanged from before this parameter existed.
 
     `output_dir` is where midas_calibrate_v2 writes calibration.json (+
     residual_corr.bin) -- the caller owns naming/placement of the final
@@ -190,7 +199,7 @@ def calibrate_lab6(tif_path, output_dir, *, dark_path=None, calibrant='LaB6',
 
     # --- Step 1: auto-seed -- BC and Lsd from the ring pattern itself.
     seed = make_seed(img, wavelength_A=meta['wavelength_A'], px_um=meta['pxY_um'],
-                      calibrant=calibrant, use_diplib=False)
+                      calibrant=calibrant, use_diplib=False, **(seed_kwargs or {}))
     if verbose:
         print(f'[calibrate_lab6] {tif_path.name}: seed {seed}')
 

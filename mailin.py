@@ -25,7 +25,7 @@ import pandas as pd
 # analysis work always runs in its own subprocess, launched with the
 # interpreter path from midas_17bm_config.BATCH_ANALYSIS_PYTHON. midas_17bm_config.py
 # itself has no heavy imports, so reading that one setting here is safe.
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 import midas_17bm_config as _pipeline_cfg
@@ -344,13 +344,22 @@ class BarcodeSearchApp(QMainWindow):
                 _pipeline_cfg.BATCH_ANALYSIS_PYTHON, str(_BATCH_PIPELINE_SCRIPT),
                 "--batch-dir", batch_dir, "--barcode", barcode,
             ]
-            popen_kwargs = dict(cwd=str(_REPO_ROOT))
+            # Force the child onto UTF-8 stdout: with stdout redirected to a
+            # file (not a console), Windows Python otherwise falls back to
+            # the system code page (cp1252 on a US-English install), and
+            # MIDAS's own print()s of non-Latin-1 symbols (e.g. chi-squared,
+            # arrows) then crash the batch with UnicodeEncodeError.
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONUTF8"] = "1"
+
+            popen_kwargs = dict(cwd=str(_REPO_ROOT), env=env)
             if os.name == "nt":
                 popen_kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
             else:
                 popen_kwargs["start_new_session"] = True
 
-            with open(log_path, "a") as logf:
+            with open(log_path, "a", encoding="utf-8") as logf:
                 subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT, **popen_kwargs)
 
             self.update_status(f"Started background calibration/integration for batch {barcode}")
@@ -933,6 +942,8 @@ class BarcodeSearchApp(QMainWindow):
 
         if total == 0:
             self.update_progress(0)
+            self.update_status("Nothing to prescan (no pending samples with TBD exposure).")
+            self.set_processing_mode(False)
             return
         first=True
         for i, row_idx in enumerate(prescan_entries):
@@ -1024,6 +1035,8 @@ class BarcodeSearchApp(QMainWindow):
         total = len(run_entries)
         if total == 0:
             self.update_progress(0)
+            self.update_status("Nothing to run (no pending samples).")
+            self.set_processing_mode(False)
             return
         self.update_progress(0)
         print("=== RUN START ===")

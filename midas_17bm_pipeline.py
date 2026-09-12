@@ -33,9 +33,12 @@ import midas_17bm_lib as lib
 POS_RE_TEMPLATE = r'^{barcode}_pos(\d+)\.tif$'
 
 
-def _calibrate_pos0(pos0_tif: Path, outfolder: Path, overwrite: bool):
+def _calibrate_pos0(pos0_tif: Path, outfolder: Path, overwrite: bool, seed_kwargs=None):
     """Calibrate the batch's pos0 (LaB6) frame, including the
-    residual_corr_bin null-out fix (see midas_17bm_lib.calibrate_lab6)."""
+    residual_corr_bin null-out fix (see midas_17bm_lib.calibrate_lab6).
+
+    `seed_kwargs` -- optional override forwarded to lib.calibrate_lab6's own
+    `seed_kwargs` (auto_seed.make_seed tuning); see that function's docstring."""
     stem = pos0_tif.stem
     final_json = outfolder / f'{stem}_midas_calib.json'
     final_png = outfolder / f'{stem}_midas_calib.png'
@@ -54,6 +57,7 @@ def _calibrate_pos0(pos0_tif: Path, outfolder: Path, overwrite: bool):
         bundle = lib.calibrate_lab6(
             pos0_tif, scratch_dir,
             calibrant=cfg.CALIBRANT, overwrite=True, default_px_um=cfg.DEFAULT_PX_UM,
+            seed_kwargs=seed_kwargs,
             **cfg.CALIBRATE_KWARGS,
         )
 
