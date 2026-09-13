@@ -57,7 +57,7 @@ CALIBRATE_KWARGS = dict(
 )
 
 # --- Integration binning defaults (mirrors MIDAS_GUI's own spin-box defaults)
-R_BIN_SIZE_PX            = 0.5
+R_BIN_SIZE_PX            = 0.2
 ETA_BIN_SIZE_DEG         = 5.0
 R_MIN_PX                 = 10.0
 R_MIN_2THETA_DEG         = 1       # if set (deg), overrides R_MIN_PX -- converted to px via the calibration's own Lsd/pxY
@@ -65,7 +65,7 @@ R_MAX_PX                 = None       # None -> auto: beam-centre-to-farthest-co
 ETA_MIN_DEG              = -180.0
 ETA_MAX_DEG              = 180.0
 BINNING_METHOD           = 'subpixel' # 'hard' | 'soft' | 'subpixel' | 'polygon'  (MIDAS_GUI default: subpixel K=2)
-SUBPIXEL_K               = 2          # only used when BINNING_METHOD == 'subpixel'
+SUBPIXEL_K               = 4          # only used when BINNING_METHOD == 'subpixel'
 POLYGON_N_JOBS           = -1         # only used when BINNING_METHOD == 'polygon'
 ERROR_MODEL              = 'poisson'  # 'poisson' | 'azimuthal' | 'hybrid'  (hard/subpixel/polygon only)
 PIXEL_WEIGHTED_AVERAGING = True       # weight each eta slice by its pixel/area coverage when collapsing to 1D

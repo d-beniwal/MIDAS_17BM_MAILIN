@@ -1,6 +1,8 @@
 # Raw/derived beamline data (huge; lives on this workstation, not in git)
 beamline_data/
 compare_midas_gsas2.py
+compare_midas_gsas2_sweep.py
+compare_midas_gsas2_sweep2.py
 
 # Old scratch work / prior draft pipeline
 archive/
