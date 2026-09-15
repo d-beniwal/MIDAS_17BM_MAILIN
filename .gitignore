@@ -1,8 +1,5 @@
 # Raw/derived beamline data (huge; lives on this workstation, not in git)
 beamline_data/
-compare_midas_gsas2.py
-compare_midas_gsas2_sweep.py
-compare_midas_gsas2_sweep2.py
 
 # Old scratch work / prior draft pipeline
 archive/
@@ -16,8 +13,9 @@ CLAUDE.md
 # residual_corr.bin alone runs tens of MB per calibration -- never commit these.
 pipeline_output/
 
-# Local dev scratch space (not part of the deliverable)
-_scratch_dev/
+# Local dev/exploratory scratch work (one-off beamline test/comparison code
+# + its data, e.g. gsas2_vs_midas/) -- not part of the maintained deliverable
+scratch/
 
 # Jupyter / Python
 .ipynb_checkpoints/
