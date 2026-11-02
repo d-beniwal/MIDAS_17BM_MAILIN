@@ -57,7 +57,7 @@ CALIBRATE_KWARGS = dict(
 )
 
 # --- Integration binning defaults (mirrors MIDAS_GUI's own spin-box defaults)
-R_BIN_SIZE_PX            = 0.2
+R_BIN_SIZE_PX            = 0.25
 ETA_BIN_SIZE_DEG         = 5.0
 R_MIN_PX                 = 10.0
 R_MIN_2THETA_DEG         = 1       # if set (deg), overrides R_MIN_PX -- converted to px via the calibration's own Lsd/pxY
