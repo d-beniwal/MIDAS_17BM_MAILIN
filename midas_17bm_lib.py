@@ -404,6 +404,7 @@ class IntegrationContext:
     binning_cfg: dict
     method: str
     pol_factor: Optional[torch.Tensor] = None
+    divide_by_distance_sq: bool = False  # divide final intensities by (Lsd in metres)^2
     mask: Optional[torch.Tensor] = None  # bool, True = bad pixel; only used at integrate time for method='soft'
                                           # (hard/subpixel/polygon bake the mask into `geom` at build time instead)
 
@@ -414,6 +415,7 @@ def build_integration_context(calibration_json_path, *,
                                r_min=10.0, r_max=None, eta_min=-180.0, eta_max=180.0,
                                subpixel_k=2, polygon_n_jobs=-1,
                                polarization=False, pol_fraction=0.99, pol_plane_eta_deg=0.0,
+                               divide_by_distance_sq=False,
                                mask=None, eta_exclude_deg=None) -> IntegrationContext:
     """Build the (spec, detector-mapping) pair for one calibration once, so
     it can be reused across many frames via integrate_with_context().
@@ -428,6 +430,10 @@ def build_integration_context(calibration_json_path, *,
     build_eta_exclusion_mask() and midas_17bm_config.ETA_EXCLUDE_DEG for the
     wedge format and the eta=0 convention. OR'd together with `mask`. None
     (default) -> no exclusion wedges.
+
+    `divide_by_distance_sq`: if True, the final integrated intensities (and
+    sigma / 2D cake) are divided by the square of the calibrated
+    sample-detector distance in metres (spec.Lsd is in um).
     """
     spec = spec_from_calibration_json(
         calibration_json_path, RBinSize=r_bin_size, EtaBinSize=eta_bin_size,
@@ -462,7 +468,7 @@ def build_integration_context(calibration_json_path, *,
         ).detach()
 
     return IntegrationContext(spec=spec, geom=geom, binning_cfg=binning_cfg, method=method,
-                               pol_factor=pol_factor, mask=mask_t)
+                               pol_factor=pol_factor, divide_by_distance_sq=divide_by_distance_sq, mask=mask_t)
 
 
 def integrate_with_context(image, context: IntegrationContext, *,
@@ -506,6 +512,13 @@ def integrate_with_context(image, context: IntegrationContext, *,
         intensity = mean_cake.mean(dim=0)
         sigma = torch.sqrt((sigma_cake ** 2).mean(dim=0))
 
+    if context.divide_by_distance_sq:
+        lsd_m = float(spec.Lsd) * 1e-6  # um -> m
+        dist_sq = lsd_m ** 2
+        intensity = intensity / dist_sq
+        sigma = sigma / dist_sq
+        mean_cake = mean_cake / dist_sq
+
     n_r = spec.n_r_bins
     r_axis_px = spec.RMin + spec.RBinSize * (np.arange(n_r) + 0.5)
     Lsd_um, pxY, wl_A = float(spec.Lsd), spec.pxY, float(spec.Wavelength)
@@ -528,6 +541,7 @@ def integrate_frame(image, calibration_json_path, *,
                      pixel_weighted_averaging=True,
                      subpixel_k=2, polygon_n_jobs=-1,
                      polarization=False, pol_fraction=0.99, pol_plane_eta_deg=0.0,
+                     divide_by_distance_sq=False,
                      mask=None) -> IntegrationResult:
     """Integrate `image` using the geometry saved in `calibration_json_path`.
 
@@ -541,6 +555,7 @@ def integrate_frame(image, calibration_json_path, *,
         r_min=r_min, r_max=r_max, eta_min=eta_min, eta_max=eta_max,
         subpixel_k=subpixel_k, polygon_n_jobs=polygon_n_jobs,
         polarization=polarization, pol_fraction=pol_fraction, pol_plane_eta_deg=pol_plane_eta_deg,
+        divide_by_distance_sq=divide_by_distance_sq,
         mask=mask,
     )
     return integrate_with_context(image, context, error_model=error_model,

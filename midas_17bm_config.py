@@ -142,6 +142,12 @@ POLARIZATION_CORRECTION    = True
 POLARIZATION_FRACTION      = 0.99   # midas package default (PolarizationCorrection default)
 POLARIZATION_PLANE_ETA_DEG = 0.0    # midas package default
 
+# --- Distance normalisation ----------------------------------------------------
+# True: divide the final integrated intensities (1D intensity, sigma and the 2D
+# cake) by the square of the calibrated detector distance in METRES (Lsd/1e6,
+# Lsd being in um in the calibration). False: leave intensities unscaled.
+DIVIDE_BY_DISTANCE_SQ = False
+
 # --- Integration output formats ------------------------------------------------
 # Any subset of: 'csv', 'xye', 'fxye', 'dat', 'esg', '2d_csv'  (see FORMAT_EXT
 # in midas_17bm_lib.py for the file extension each one writes).

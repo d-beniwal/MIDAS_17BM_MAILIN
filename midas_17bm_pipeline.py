@@ -202,6 +202,7 @@ def main():
         subpixel_k=cfg.SUBPIXEL_K, polygon_n_jobs=cfg.POLYGON_N_JOBS,
         polarization=cfg.POLARIZATION_CORRECTION, pol_fraction=cfg.POLARIZATION_FRACTION,
         pol_plane_eta_deg=cfg.POLARIZATION_PLANE_ETA_DEG,
+        divide_by_distance_sq=cfg.DIVIDE_BY_DISTANCE_SQ,
         mask=mask_file, eta_exclude_deg=cfg.ETA_EXCLUDE_DEG,
     )
 
