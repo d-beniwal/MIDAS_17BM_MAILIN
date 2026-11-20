@@ -105,7 +105,7 @@ Bad-pixel masking is configured via `mask_file` in the `midas_mailin` YAML
 config (`.tif`/`.tiff` or `.npy`, same shape as the detector image; 1/non-zero
 = bad, 0 = good; default: no mask). Note the `BadPixel_*.tif` files under
 `apr/`/`Jun/` are **not** masks: they are detector images (median ~12,000
-counts, 99.9% non-zero), and `midas_mailin` rejects any mask flagging >10% of
-pixels. The real bad-pixel lists are the sibling `BadPixel_*.json` files
+counts, 99.9% non-zero), and `midas_mailin` prints a WARNING (and continues) when a mask excludes
+>10% of the pixels. The real bad-pixel lists are the sibling `BadPixel_*.json` files
 (512 `[a, b]` pixel coordinates; the axis order is unverified), which would
 need converting to a 0/1 array before use.

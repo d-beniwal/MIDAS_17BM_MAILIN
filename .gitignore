@@ -7,6 +7,7 @@ archive/
 # Claude Code project context and docs (kept local per project convention)
 .context/
 CLAUDE.md
+AGENTS.md
 .claude/
 
 # Pipeline outputs (calibration.json, residual_corr.bin, integrated profiles, plots)
