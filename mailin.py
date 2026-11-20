@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import time
 import subprocess
 from pathlib import Path
@@ -19,18 +20,20 @@ from beamline17bm_real import Beamline17BM
 from collections import defaultdict
 import pandas as pd
 
-# --- Batch analysis pipeline hook -------------------------------------------
-# midas_17bm_pipeline.py (repo root) needs midas_*/torch,
-# which live in a DIFFERENT conda env than this GUI (PyQt5 + epics) -- so the
-# analysis work always runs in its own subprocess, launched with the
-# interpreter path from midas_17bm_config.BATCH_ANALYSIS_PYTHON. midas_17bm_config.py
-# itself has no heavy imports, so reading that one setting here is safe.
+# --- Batch analysis hook (midas_mailin) --------------------------------------
+# Calibration + integration is done by the separate, independently maintained
+# `midas_mailin` package (github/midas_mailin), which needs midas_*/torch and
+# therefore lives in its OWN conda env (`midas_mailin`, see that repo's
+# environment.yml). This GUI never imports it: it only launches that env's
+# python as a detached subprocess and hands it file lists. Deployment settings
+# below (update on the beamline control PC; env vars take precedence):
+MIDAS_MAILIN_PYTHON = os.environ.get(
+    "MIDAS_MAILIN_PYTHON",
+    r"C:\Users\17bmuser\AppData\Local\miniconda3\envs\midas_mailin\python")
+MIDAS_MAILIN_CONFIG = os.environ.get(
+    "MIDAS_MAILIN_CONFIG",
+    r"C:\Users\17bmuser\midas_mailin\configs\beamline_17bm.yaml")
 _REPO_ROOT = Path(__file__).resolve().parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-import midas_17bm_config as _pipeline_cfg
-
-_BATCH_PIPELINE_SCRIPT = _REPO_ROOT / "midas_17bm_pipeline.py"
 
 
 
@@ -324,10 +327,15 @@ class BarcodeSearchApp(QMainWindow):
         QApplication.processEvents()  # ensure immediate GUI update
 
     def launch_batch_pipeline(self, barcode):
-        """Kick off midas_17bm_pipeline.py (calibrate + integrate) for a
-        just-completed batch as a detached background process. Never blocks
-        and never raises into the acquisition flow -- a failure here only
-        means analysis didn't start, not that data collection is affected.
+        """Kick off midas_mailin (calibrate + integrate) for a just-completed
+        batch as a detached background process. Never blocks and never raises
+        into the acquisition flow -- a failure here only means analysis didn't
+        start, not that data collection is affected.
+
+        This program owns the hand-off: it decides which frame is the
+        calibrant (<barcode>_pos0.tif) and which are to be integrated
+        (every other <barcode>_posN.tif, numerically sorted), and passes them
+        to midas_mailin as explicit file lists.
         """
         if not barcode:
             return
@@ -336,13 +344,30 @@ class BarcodeSearchApp(QMainWindow):
             # write_single_entry() already write into -- duplicated here
             # read-only, beamline17bm_real.py itself is not touched.
             now = datetime.now()
-            batch_dir = os.path.join(r"Y:\mail_in", str(now.year), now.strftime("%b"))
-            log_path = os.path.join(batch_dir, f"{barcode}_batch_pipeline.log")
+            batch_dir = Path(r"Y:\mail_in", str(now.year), now.strftime("%b"))
+            log_path = batch_dir / f"{barcode}_batch_pipeline.log"
             os.makedirs(batch_dir, exist_ok=True)
 
+            pos_re = re.compile(rf"^{re.escape(barcode)}_pos(\d+)\.tif$")
+            frames = {}
+            for tif in batch_dir.glob(f"{barcode}_pos*.tif"):
+                m = pos_re.match(tif.name)
+                if m:
+                    frames[int(m.group(1))] = tif
+            calib = frames.pop(0, None)
+            if calib is None:
+                print(f"[WARN] No calibrant frame {barcode}_pos0.tif in {batch_dir}; analysis not started")
+                return
+            integ = [frames[k] for k in sorted(frames)]
+            # file list instead of argv: a batch can have many frames and
+            # Windows caps the command-line length
+            integ_list = batch_dir / f"{barcode}_integ_list.txt"
+            integ_list.write_text("\n".join(str(p) for p in integ) + "\n", encoding="utf-8")
+
             cmd = [
-                _pipeline_cfg.BATCH_ANALYSIS_PYTHON, str(_BATCH_PIPELINE_SCRIPT),
-                "--batch-dir", batch_dir, "--barcode", barcode,
+                MIDAS_MAILIN_PYTHON, "-m", "midas_mailin",
+                "--calib", str(calib), "--integ-list", str(integ_list),
+                "--outdir", str(batch_dir), "--config", MIDAS_MAILIN_CONFIG,
             ]
             # Force the child onto UTF-8 stdout: with stdout redirected to a
             # file (not a console), Windows Python otherwise falls back to
@@ -353,7 +378,7 @@ class BarcodeSearchApp(QMainWindow):
             env["PYTHONIOENCODING"] = "utf-8"
             env["PYTHONUTF8"] = "1"
 
-            popen_kwargs = dict(cwd=str(_REPO_ROOT), env=env)
+            popen_kwargs = dict(cwd=str(batch_dir), env=env)
             if os.name == "nt":
                 popen_kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
             else:
