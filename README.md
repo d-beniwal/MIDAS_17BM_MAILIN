@@ -73,7 +73,8 @@ off-site, so several things are hardcoded to placeholder/dev values and
   (created there from the `midas_mailin` repo's `environment.yml`);
   `MIDAS_MAILIN_CONFIG` at the beamline YAML config in that repo's
   `configs/` (this is also where a bad-pixel mask, `mask_file`, is set --
-  point it at the workstation's current dense `BadPixel_*.tif`).
+  point it only at a genuine 0/1 mask, **not** a `BadPixel_*.tif`, which is
+  a detector image).
 - **`DATABASE_URL` in `BarcodeSearchApp.initDB()`** — hardcoded to
   `mysql+mysqlconnector://11bm:staff11bm@s11bmsrv1/mailin`, i.e. the
   **11-BM** scan-request database host/credentials. This must be updated
@@ -102,6 +103,9 @@ frames (`apr/`/`Jun/`/`mar/`) and dark-frame subtraction wiring.
 
 Bad-pixel masking is configured via `mask_file` in the `midas_mailin` YAML
 config (`.tif`/`.tiff` or `.npy`, same shape as the detector image; 1/non-zero
-= bad, 0 = good; default: no mask). The dense `BadPixel_*.tif` files under
-`apr/`/`Jun/` are usable as-is; the sibling `BadPixel_*.json` coordinate lists
-are not directly consumable.
+= bad, 0 = good; default: no mask). Note the `BadPixel_*.tif` files under
+`apr/`/`Jun/` are **not** masks: they are detector images (median ~12,000
+counts, 99.9% non-zero), and `midas_mailin` rejects any mask flagging >10% of
+pixels. The real bad-pixel lists are the sibling `BadPixel_*.json` files
+(512 `[a, b]` pixel coordinates; the axis order is unverified), which would
+need converting to a 0/1 array before use.
